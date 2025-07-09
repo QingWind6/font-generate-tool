@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Font Glyph Extractor and Viewer</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1, h2 {
+            text-align: center;
+            color: #1a237e;
+        }
+
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #555;
+        }
+
+        input, select, textarea {
+            padding: 0.75rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1rem;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        textarea:read-only {
+            background-color: #eef2f3;
+            cursor: not-allowed;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            background-color: #3f51b5;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            width: 100%;
+        }
+
+        button:hover {
+            background-color: #303f9f;
+        }
+        
+        button:disabled {
+            background-color: #9fa8da;
+            cursor: not-allowed;
+        }
+
+        .preview-box, .metadata-box {
+            background-color: #263238;
+            color: white;
+            border: 1px solid #455a64;
+            border-radius: 4px;
+            padding: 1rem;
+            min-height: 150px;
+            display: flex; 
+            align-items: center;
+            justify-content: flex-start; 
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        .preview-box canvas {
+            background-color: #37474f;
+            image-rendering: pixelated; 
+            height: 60px;
+            width: auto;
+        }
+        
+        .progress-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            margin-top: 1rem;
+            display: none;
+        }
+        
+        .progress-bar {
+            width: 0%;
+            height: 20px;
+            background-color: #4caf50;
+            border-radius: 4px;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            transition: width 0.2s;
+        }
+
+        .divider {
+            border-top: 2px solid #e0e0e0;
+            margin: 3rem 0;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Web-Based Font Toolkit</h1>
+
+    <div class="container">
+        <h2>1. Font Glyph Extractor</h2>
+        <div class="grid">
+            <div>
+                <div class="control-group">
+                    <label for="font-file">Select Font File (.ttf, .otf)</label>
+                    <input type="file" id="font-file" accept=".ttf,.otf,.woff,.woff2">
+                </div>
+                <div class="control-group">
+                    <label for="font-size">Font Size (pt)</label>
+                    <input type="number" id="font-size" value="16" min="8" max="128">
+                </div>
+                <div class="control-group">
+                    <label for="bolding-x">Horizontal Bolding (px) <span id="bolding-x-value">0</span></label>
+                    <input type="range" id="bolding-x" value="0" min="-5" max="5" step="1" style="padding: 0;">
+                </div>
+                <div class="control-group">
+                    <label for="bolding-y">Vertical Bolding (px) <span id="bolding-y-value">0</span></label>
+                    <input type="range" id="bolding-y" value="0" min="-5" max="5" step="1" style="padding: 0;">
+                </div>
+                 <div class="control-group">
+                    <label for="encoding-format">Export Encoding</label>
+                    <select id="encoding-format">
+                        <option value="unicode" selected>Unicode (Recommended)</option>
+                        <option value="gb2312">GB2312</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="charset-preset">Choose a Character Set Preset</label>
+                    <select id="charset-preset">
+                        <option value="custom">Custom</option>
+                        <option value="latin1">Latin-1 (Western European)</option>
+                        <option value="gb2312">GB2312 (Common Chinese + Punctuation)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="charset">Character Set</label>
+                    <textarea id="charset" placeholder="Enter characters here, or select a preset above."></textarea>
+                </div>
+                <button id="extract-btn" disabled>Generate .bin File</button>
+                <div class="progress-container" id="extractor-progress-container">
+                    <div class="progress-bar" id="extractor-progress-bar">0%</div>
+                </div>
+            </div>
+
+            <div>
+                <div class="control-group">
+                    <label for="text-to-preview">Text to Preview</label>
+                    <textarea id="text-to-preview" placeholder="Preview text here..." rows="2">Hello World! 你好世界！</textarea>
+                </div>
+                <label>Monochrome Preview (True to Export)</label>
+                <div class="preview-box" id="extractor-preview">Awaiting Font...</div>
+                <p style="text-align: center; margin-top: 1rem;" id="glyph-dimensions">Glyph Dimensions: N/A</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="container">
+        <h2>2. Font .bin File Viewer</h2>
+        <div class="grid">
+            <div>
+                <div class="control-group">
+                    <label for="bin-file">Select .bin File</label>
+                    <input type="file" id="bin-file" accept=".bin">
+                </div>
+                <div class="control-group">
+                    <label for="text-to-render">Text to Preview</label>
+                    <textarea id="text-to-render" placeholder="Enter text here to see it rendered with the .bin font"></textarea>
+                </div>
+            </div>
+            <div>
+                <div class="control-group">
+                    <label>Metadata</label>
+                    <div class="metadata-box" id="viewer-metadata">Upload a .bin file to see its metadata.</div>
+                </div>
+                <div class="control-group">
+                    <label>Glyph Preview</label>
+                    <div class="preview-box" id="viewer-preview">Glyphs will be rendered here.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <canvas id="render-canvas" style="display:none;"></canvas>
+
+    <script>
+    // --- UTILITY AND SETUP ---
+    const extractor = {
+        fontFile: document.getElementById('font-file'),
+        fontSize: document.getElementById('font-size'),
+        boldingX: document.getElementById('bolding-x'),
+        boldingXValue: document.getElementById('bolding-x-value'),
+        boldingY: document.getElementById('bolding-y'),
+        boldingYValue: document.getElementById('bolding-y-value'),
+        encodingFormat: document.getElementById('encoding-format'), // NEW
+        charsetPreset: document.getElementById('charset-preset'),
+        charset: document.getElementById('charset'),
+        textToPreview: document.getElementById('text-to-preview'),
+        extractBtn: document.getElementById('extract-btn'),
+        previewBox: document.getElementById('extractor-preview'),
+        dimensionsLabel: document.getElementById('glyph-dimensions'),
+        progressBar: document.getElementById('extractor-progress-bar'),
+        progressContainer: document.getElementById('extractor-progress-container'),
+        renderCanvas: document.getElementById('render-canvas')
+    };
+
+    const viewer = {
+        binFile: document.getElementById('bin-file'),
+        textToRender: document.getElementById('text-to-render'),
+        metadataBox: document.getElementById('viewer-metadata'),
+        previewBox: document.getElementById('viewer-preview'),
+    };
+    
+    let loadedFont = null;
+
+    // --- PART 1: EXTRACTOR LOGIC ---
+
+    extractor.charsetPreset.onchange = () => {
+        const preset = extractor.charsetPreset.value;
+        const textarea = extractor.charset;
+        let charString = '';
+
+        switch(preset) {
+            case 'latin1':
+                for (let i = 0x20; i <= 0xFF; i++) {
+                    charString += String.fromCharCode(i);
+                }
+                textarea.readOnly = true;
+                break;
+            
+            case 'gb2312':
+                const punctuation =
+                    ' !"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~' +
+                    '，。、！？；：…—·（）《》“”‘’';
+                charString = punctuation;
+                // Common simplified Chinese characters
+                for (let i = 0x4e00; i <= 0x9FA5; i++) {
+                    charString += String.fromCharCode(i);
+                }
+                textarea.value = charString;
+                textarea.readOnly = true;
+                break;
+
+            case 'custom':
+            default:
+                textarea.readOnly = false;
+                textarea.placeholder = "Enter custom characters here, or select a preset above.";
+                break;
+        }
+
+        textarea.value = charString;
+        updateExtractorPreview();
+    };
+
+    extractor.fontFile.onchange = async (event) => {
+        const file = event.target.files[0];
+        if (!file) {
+            extractor.extractBtn.disabled = true;
+            loadedFont = null;
+            return;
+        }
+        
+        try {
+            const fontFace = new FontFace('custom-font', `url(${URL.createObjectURL(file)})`);
+            await fontFace.load();
+            document.fonts.add(fontFace);
+            loadedFont = 'custom-font';
+            extractor.extractBtn.disabled = false;
+            updateExtractorPreview();
+        } catch (e) {
+            console.error("Font loading failed:", e);
+            alert("Error: Could not load the font file.");
+            loadedFont = null;
+            extractor.extractBtn.disabled = true;
+        }
+    };
+    
+    extractor.fontSize.oninput = updateExtractorPreview;
+    extractor.charset.oninput = updateExtractorPreview;
+    extractor.textToPreview.oninput = updateExtractorPreview;
+    extractor.boldingX.oninput = () => {
+        extractor.boldingXValue.textContent = extractor.boldingX.value;
+        updateExtractorPreview();
+    };
+    extractor.boldingY.oninput = () => {
+        extractor.boldingYValue.textContent = extractor.boldingY.value;
+        updateExtractorPreview();
+    };
+
+    function applyMorphology(ctx, width, height, strengthX, strengthY, color) {
+        if (strengthX === 0 && strengthY === 0) return;
+
+        const originalImageData = ctx.getImageData(0, 0, width, height);
+        const originalData = new Uint8ClampedArray(originalImageData.data);
+        const newData = originalImageData.data;
+
+        const dilateX = Math.max(0, strengthX);
+        const dilateY = Math.max(0, strengthY);
+        const erodeX = Math.abs(Math.min(0, strengthX));
+        const erodeY = Math.abs(Math.min(0, strengthY));
+
+        if (dilateX > 0 || dilateY > 0) {
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const i = (y * width + x) * 4;
+                    if (originalData[i + 3] < 128) { // if transparent
+                        let foundNeighbor = false;
+                        for (let ky = -dilateY; ky <= dilateY && !foundNeighbor; ky++) {
+                            for (let kx = -dilateX; kx <= dilateX; kx++) {
+                                const nx = x + kx;
+                                const ny = y + ky;
+                                if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                                    const ni = (ny * width + nx) * 4;
+                                    if (originalData[ni + 3] > 128) { // if neighbor is opaque
+                                        newData[i] = color.r; newData[i + 1] = color.g; newData[i + 2] = color.b; newData[i + 3] = 255;
+                                        foundNeighbor = true; break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        originalData.set(newData);
+        
+        if (erodeX > 0 || erodeY > 0) {
+             for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const i = (y * width + x) * 4;
+                    if (originalData[i + 3] > 128) { // if opaque
+                        let foundNeighbor = false;
+                        for (let ky = -erodeY; ky <= erodeY && !foundNeighbor; ky++) {
+                            for (let kx = -erodeX; kx <= erodeX; kx++) {
+                                const nx = x + kx;
+                                const ny = y + ky;
+                                if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                                     const ni = (ny * width + nx) * 4;
+                                    if (originalData[ni + 3] < 128) { // if neighbor is transparent
+                                        newData[i + 3] = 0; foundNeighbor = true; break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        ctx.putImageData(originalImageData, 0, 0);
+    }
+    
+    function updateExtractorPreview() {
+        if (!loadedFont) {
+            extractor.previewBox.innerHTML = 'Awaiting Font...';
+            return;
+        }
+
+        const text = extractor.textToPreview.value;
+        if (!text) {
+            extractor.previewBox.innerHTML = 'Enter text to preview...';
+            extractor.dimensionsLabel.innerText = `Glyph Dimensions: N/A`;
+            return;
+        }
+
+        const size = parseInt(extractor.fontSize.value);
+        const boldingX = parseInt(extractor.boldingX.value);
+        const boldingY = parseInt(extractor.boldingY.value);
+        const paddingX = Math.abs(boldingX) * 2;
+        const paddingY = Math.abs(boldingY) * 2;
+        
+        const renderCtx = extractor.renderCanvas.getContext('2d', { willReadFrequently: true });
+        renderCtx.font = `${size}px ${loadedFont}`;
+
+        const uniqueChars = [...new Set(text)];
+        const metricsSample = renderCtx.measureText('Ag');
+        const fontAscent = Math.ceil(metricsSample.fontBoundingBoxAscent || metricsSample.actualBoundingBoxAscent);
+        const fontDescent = Math.ceil(metricsSample.fontBoundingBoxDescent || metricsSample.actualBoundingBoxDescent);
+        let maxW = 0;
+        for (const char of uniqueChars) {
+            maxW = Math.max(maxW, Math.ceil(renderCtx.measureText(char).width));
+        }
+        let maxH = fontAscent + fontDescent;
+        maxW += paddingX;
+        maxH += paddingY;
+        const glyphWidth = (maxW + 7) & ~7;
+        const glyphHeight = maxH;
+        
+        if (glyphWidth <= 0 || glyphHeight <= 0 || isNaN(glyphWidth) || isNaN(glyphHeight)) {
+             extractor.dimensionsLabel.innerText = `Glyph Dimensions: Invalid`;
+             return;
+        }
+        extractor.dimensionsLabel.innerText = `Glyph Dimensions: ${glyphWidth}x${glyphHeight}`;
+
+        const previewCanvas = document.createElement('canvas');
+        previewCanvas.width = glyphWidth * text.length;
+        previewCanvas.height = glyphHeight;
+        const previewCtx = previewCanvas.getContext('2d');
+        const glyphCache = new Map();
+
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+            let monochromeImageData;
+
+            if (glyphCache.has(char)) {
+                monochromeImageData = glyphCache.get(char);
+            } else {
+                extractor.renderCanvas.width = glyphWidth;
+                extractor.renderCanvas.height = glyphHeight;
+                renderCtx.font = `${size}px ${loadedFont}`;
+                renderCtx.fillStyle = 'black';
+                renderCtx.textBaseline = 'middle';
+                renderCtx.textAlign = 'center';
+                renderCtx.clearRect(0, 0, glyphWidth, glyphHeight);
+                renderCtx.fillText(char, glyphWidth / 2, glyphHeight / 2);
+
+                if (boldingX !== 0 || boldingY !== 0) {
+                    applyMorphology(renderCtx, glyphWidth, glyphHeight, boldingX, boldingY, { r: 0, g: 0, b: 0 });
+                }
+
+                const sourceImageData = renderCtx.getImageData(0, 0, glyphWidth, glyphHeight);
+                monochromeImageData = previewCtx.createImageData(glyphWidth, glyphHeight);
+                
+                for (let j = 0; j < sourceImageData.data.length; j += 4) {
+                    if (sourceImageData.data[j + 3] > 128) {
+                        monochromeImageData.data[j] = 255; monochromeImageData.data[j + 1] = 255; monochromeImageData.data[j + 2] = 255; monochromeImageData.data[j + 3] = 255;
+                    }
+                }
+                glyphCache.set(char, monochromeImageData);
+            }
+            
+            previewCtx.putImageData(monochromeImageData, i * glyphWidth, 0);
+        }
+
+        extractor.previewBox.innerHTML = '';
+        extractor.previewBox.appendChild(previewCanvas);
+    }
+    
+    // MODIFIED: Complete rewrite of the export function
+    extractor.extractBtn.onclick = async () => {
+        if (!loadedFont) {
+            alert("Please select a font file first.");
+            return;
+        }
+
+        const initialChars = [...new Set(extractor.charset.value.trim())];
+        if (initialChars.length === 0) {
+            alert("Character set is empty.");
+            return;
+        }
+        
+        const encoding = extractor.encodingFormat.value;
+
+        extractor.extractBtn.disabled = true;
+        extractor.progressContainer.style.display = 'block';
+        extractor.progressBar.style.width = '0%';
+        extractor.progressBar.textContent = '0%';
+
+        setTimeout(() => {
+            const size = parseInt(extractor.fontSize.value);
+            const boldingX = parseInt(extractor.boldingX.value);
+            const boldingY = parseInt(extractor.boldingY.value);
+            const paddingX = Math.abs(boldingX) * 2;
+            const paddingY = Math.abs(boldingY) * 2;
+
+            const ctx = extractor.renderCanvas.getContext('2d', { willReadFrequently: true });
+            ctx.font = `${size}px ${loadedFont}`;
+            
+            const metricsSample = ctx.measureText('Ag');
+            const fontAscent = Math.ceil(metricsSample.fontBoundingBoxAscent || metricsSample.actualBoundingBoxAscent);
+            const fontDescent = Math.ceil(metricsSample.fontBoundingBoxDescent || metricsSample.actualBoundingBoxDescent);
+
+            let maxW = 0;
+            for (const char of initialChars) {
+                maxW = Math.max(maxW, Math.ceil(ctx.measureText(char).width));
+            }
+
+            let maxH = fontAscent + fontDescent;
+            maxW += paddingX;
+            maxH += paddingY;
+            
+            const glyphWidth = (maxW + 7) & ~7;
+            const glyphHeight = maxH;
+
+            if (glyphWidth <= 0 || glyphHeight <= 0 || isNaN(glyphWidth) || isNaN(glyphHeight)) {
+                alert("Could not calculate valid glyph dimensions. The font file might be corrupt or incompatible.");
+                extractor.extractBtn.disabled = false;
+                extractor.progressContainer.style.display = 'none';
+                return;
+            }
+            
+            const glyphByteSize = (glyphWidth * glyphHeight) / 8;
+            const glyphDataMap = new Map();
+            const skippedChars = [];
+            const gbEncoder = (encoding === 'gb2312') ? new TextEncoder('gb18030') : null;
+
+            for (let i = 0; i < initialChars.length; i++) {
+                const char = initialChars[i];
+                let key;
+
+                if (encoding === 'gb2312') {
+                    const encoded = gbEncoder.encode(char);
+                    if (encoded.length !== 2) {
+                        skippedChars.push(char);
+                        continue;
+                    }
+                    key = (encoded[0] << 8) | encoded[1];
+                } else { // unicode
+                    key = char.charCodeAt(0);
+                }
+
+                if (glyphDataMap.has(key)) continue;
+                
+                extractor.renderCanvas.width = glyphWidth;
+                extractor.renderCanvas.height = glyphHeight;
+                ctx.font = `${size}px ${loadedFont}`;
+                ctx.textBaseline = 'middle';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = 'black';
+                ctx.clearRect(0, 0, glyphWidth, glyphHeight);
+                ctx.fillText(char, glyphWidth / 2, glyphHeight / 2);
+
+                if (boldingX !== 0 || boldingY !== 0) {
+                    applyMorphology(ctx, glyphWidth, glyphHeight, boldingX, boldingY, { r: 0, g: 0, b: 0 });
+                }
+
+                const imageData = ctx.getImageData(0, 0, glyphWidth, glyphHeight).data;
+                const bits = new Uint8Array(glyphByteSize);
+                
+                for (let j = 0; j < imageData.length / 4; j++) {
+                    const byteIndex = Math.floor(j / 8);
+                    const bitIndex = 7 - (j % 8);
+                    if (imageData[j * 4 + 3] > 128) {
+                        bits[byteIndex] |= (1 << bitIndex);
+                    }
+                }
+                glyphDataMap.set(key, bits);
+                
+                const progress = Math.round(((i + 1) / initialChars.length) * 100);
+                extractor.progressBar.style.width = `${progress}%`;
+                extractor.progressBar.textContent = `${progress}%`;
+            }
+
+            const finalCharCount = glyphDataMap.size;
+            if (finalCharCount === 0) {
+                alert("No valid characters could be processed for the selected encoding.");
+                extractor.extractBtn.disabled = false;
+                extractor.progressContainer.style.display = 'none';
+                return;
+            }
+
+            const fontName = extractor.fontFile.files[0].name.replace(/\.[^/.]+$/, "");
+            const headerSize = 48; // MODIFIED
+            const lookupEntrySize = 8; // Key (4 bytes) + Offset (4 bytes)
+            const lookupTableSize = finalCharCount * lookupEntrySize;
+            const glyphDataSize = finalCharCount * glyphByteSize;
+            const buffer = new ArrayBuffer(headerSize + lookupTableSize + glyphDataSize);
+            const dataView = new DataView(buffer);
+            let offset = 0;
+
+            const fontNameBytes = new TextEncoder().encode(fontName);
+            for(let i=0; i<32; i++) {
+                dataView.setUint8(offset + i, i < fontNameBytes.length ? fontNameBytes[i] : 0);
+            }
+            offset += 32;
+            
+            dataView.setUint16(offset, size, false); offset += 2;
+            dataView.setUint16(offset, glyphWidth, false); offset += 2;
+            dataView.setUint32(offset, glyphHeight, false); offset += 4;
+            dataView.setUint32(offset, finalCharCount, false); offset += 4;
+            // NEW: Add encoding type and reserved bytes
+            dataView.setUint8(offset, encoding === 'gb2312' ? 1 : 0, false); offset += 1;
+            offset += 3; // Reserved bytes
+
+            const glyphDataStartOffset = headerSize + lookupTableSize;
+            let glyphOffset = 0;
+            const allGlyphBytes = new Uint8Array(glyphDataSize);
+
+            const sortedKeys = [...glyphDataMap.keys()].sort((a,b) => a-b);
+            for (const key of sortedKeys) {
+                // We always write the key as a 4-byte integer for simplicity and alignment.
+                dataView.setUint32(offset, key, false);
+                dataView.setUint32(offset + 4, glyphOffset, false);
+                offset += lookupEntrySize;
+                
+                const glyphBytes = glyphDataMap.get(key);
+                allGlyphBytes.set(glyphBytes, glyphOffset);
+                glyphOffset += glyphBytes.length;
+            }
+            
+            new Uint8Array(buffer).set(allGlyphBytes, glyphDataStartOffset);
+
+            const blob = new Blob([buffer], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${fontName}_${size}pt_${glyphWidth}x${glyphHeight}_${encoding}.bin`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            extractor.extractBtn.disabled = false;
+            
+            let completionMessage = 'Generation complete!';
+            if (skippedChars.length > 0) {
+                completionMessage += `\n\nWarning: ${skippedChars.length} characters were skipped because they could not be encoded in GB2312.\nSkipped: ${skippedChars.slice(0, 20).join('')}...`;
+            }
+            alert(completionMessage);
+
+        }, 50);
+    };
+
+
+    // --- PART 2: VIEWER LOGIC (MODIFIED) ---
+
+    let fontBinData = null;
+
+    viewer.binFile.onchange = async (event) => {
+        const file = event.target.files[0];
+        if (!file) {
+            fontBinData = null;
+            return;
+        }
+
+        try {
+            const buffer = await file.arrayBuffer();
+            const dataView = new DataView(buffer);
+            
+            // MODIFIED: Read new 48-byte header
+            const headerSize = 48;
+            if (buffer.byteLength < headerSize) throw new Error("File is smaller than the minimum header size.");
+
+            const fontNameBytes = new Uint8Array(buffer, 0, 32);
+            const name = new TextDecoder("utf-8").decode(fontNameBytes).replace(/\0/g, '');
+            const fontSize = dataView.getUint16(32, false);
+            const glyphWidth = dataView.getUint16(34, false);
+            const glyphHeight = dataView.getUint32(36, false);
+            const charCount = dataView.getUint32(40, false);
+            const encodingType = dataView.getUint8(44, false); // 0: unicode, 1: gb2312
+            const encodingName = encodingType === 1 ? 'GB2312' : 'Unicode';
+            
+            const lookupTable = new Map();
+            const lookupEntrySize = 8;
+            const lookupTableSize = charCount * lookupEntrySize;
+            if (buffer.byteLength < headerSize + lookupTableSize) throw new Error("File is too small for its declared lookup table.");
+
+            for (let i = 0; i < charCount; i++) {
+                const entryOffset = headerSize + i * lookupEntrySize;
+                const key = dataView.getUint32(entryOffset, false);
+                const dataOffset = dataView.getUint32(entryOffset + 4, false);
+                lookupTable.set(key, dataOffset);
+            }
+            
+            const glyphDataStartOffset = headerSize + lookupTableSize;
+            const glyphData = new Uint8Array(buffer, glyphDataStartOffset);
+
+            fontBinData = { name, fontSize, glyphWidth, glyphHeight, charCount, encodingType, encodingName, lookupTable, glyphData };
+            
+            viewer.metadataBox.innerText = `Font Name: ${name}\nFont Size: ${fontSize}pt\nGlyph Dimensions: ${glyphWidth}x${glyphHeight}\nCharacter Count: ${charCount}\nEncoding: ${encodingName}`;
+
+            renderBinGlyphs();
+
+        } catch (e) {
+            console.error("Failed to read .bin file:", e);
+            alert("Error: Invalid or corrupt .bin file. " + e.message);
+            fontBinData = null;
+        }
+    };
+    
+    viewer.textToRender.oninput = renderBinGlyphs;
+    
+    function renderBinGlyphs() {
+        if (!fontBinData) return;
+
+        const text = viewer.textToRender.value;
+        viewer.previewBox.innerHTML = '';
+        
+        if (!text) {
+            viewer.previewBox.innerText = "Glyphs will be rendered here.";
+            return;
+        }
+        
+        const { glyphWidth, glyphHeight, lookupTable, glyphData, encodingType } = fontBinData;
+        const glyphByteSize = (glyphWidth * glyphHeight) / 8;
+        const gbEncoder = (encodingType === 1) ? new TextEncoder('gb18030') : null;
+        
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        const validGlyphs = [];
+        for (const char of text) {
+            let key;
+            if (encodingType === 1) { // GB2312
+                const encoded = gbEncoder.encode(char);
+                if (encoded.length !== 2) continue; // Skip chars not in GB2312
+                key = (encoded[0] << 8) | encoded[1];
+            } else { // Unicode
+                key = char.charCodeAt(0);
+            }
+
+            const dataOffset = lookupTable.get(key);
+            if (dataOffset !== undefined) {
+                const glyphBytes = glyphData.subarray(dataOffset, dataOffset + glyphByteSize);
+                validGlyphs.push(glyphBytes);
+            }
+        }
+        
+        if (validGlyphs.length === 0) {
+            viewer.previewBox.innerText = "No matching glyphs found in file for the input text.";
+            return;
+        }
+        
+        canvas.width = glyphWidth * validGlyphs.length;
+        canvas.height = glyphHeight;
+        
+        const imageData = ctx.createImageData(canvas.width, canvas.height);
+        
+        validGlyphs.forEach((glyphBytes, i) => {
+            const startX = i * glyphWidth;
+            for (let byteIdx = 0; byteIdx < glyphBytes.length; byteIdx++) {
+                const byteValue = glyphBytes[byteIdx];
+                for (let bitIdx = 0; bitIdx < 8; bitIdx++) {
+                    if ((byteValue >> (7 - bitIdx)) & 1) {
+                        const pixelInGlyph = byteIdx * 8 + bitIdx;
+                        const x = startX + (pixelInGlyph % glyphWidth);
+                        const y = Math.floor(pixelInGlyph / glyphWidth);
+                        
+                        const pixelIndex = (y * canvas.width + x) * 4;
+                        imageData.data[pixelIndex] = 255;
+                        imageData.data[pixelIndex + 1] = 255;
+                        imageData.data[pixelIndex + 2] = 255;
+                        imageData.data[pixelIndex + 3] = 255;
+                    }
+                }
+            }
+        });
+        
+        ctx.putImageData(imageData, 0, 0);
+        
+        viewer.previewBox.appendChild(canvas);
+    }
+    
+    // Initial calls to set default state
+    extractor.charsetPreset.onchange();
+    updateExtractorPreview();
+
+    </script>
+</body>
+</html>
